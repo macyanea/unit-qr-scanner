@@ -1,0 +1,74 @@
+// При открытии скрипта — сразу устанавливаем формат "Текст" на весь столбец C
+function onOpen() {
+  const sheet = getSheet();
+  // Столбец C:C — это ячейка с датой
+  sheet.getRange('C:C').setNumberFormat('@STRING@');
+}
+
+// Утилита — получаем первый лист
+function getSheet() {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+}
+
+// Обработчик GET: возвращает { exists, name, scans }
+function doGet(e) {
+  const empId = String(e.parameter.employeeId  || '');
+  const date  = String(e.parameter.date        || '');
+  const sheet = getSheet();
+  const lastRow = sheet.getLastRow();
+  
+  if (lastRow < 2) {
+    return createJsonOutput({ exists: false, name: '', scans: 0 });
+  }
+  
+  const all = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
+  const firstMatch = all.find(r => String(r[0]) === empId);
+  const exists = !!firstMatch;
+  const name   = exists ? firstMatch[1] : '';
+  
+  let scans = 0;
+  if (date) {
+    scans = all.filter(r =>
+      String(r[0]) === empId &&
+      String(r[2]) === date
+    ).length;
+  }
+  
+  return createJsonOutput({ exists, name, scans });
+}
+
+// Обработчик POST: добавляет новую строку и гарантирует текстовый формат колонки C
+function doPost(e) {
+  const empId  = String(e.parameter.employeeId || '');
+  let name     = String(e.parameter.fullName    || '');
+  const date   = String(e.parameter.date        || '');
+  const time   = String(e.parameter.time        || '');
+  const action = String(e.parameter.action      || '');
+
+  const sheet   = getSheet();
+  const lastRow = sheet.getLastRow();
+  
+  // Подхватываем ФИО, если уже было
+  if (lastRow >= 2) {
+    const prev = sheet.getRange(2, 1, lastRow - 1, 2)
+                      .getValues()
+                      .find(r => String(r[0]) === empId);
+    if (prev) name = prev[1];
+  }
+  
+  // Добавляем строку
+  sheet.appendRow([empId, name, date, time, action]);
+  
+  // После добавления устанавливаем текстовый формат для ячейки с датой
+  const newRow = sheet.getLastRow();
+  sheet.getRange(newRow, 3).setNumberFormat('@STRING@');
+  
+  return createJsonOutput({ status: 'ok' });
+}
+
+// Помощник для JSON-ответа
+function createJsonOutput(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}

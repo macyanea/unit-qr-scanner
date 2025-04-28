@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <link rel="icon" href="logo.ico" type="image/x-icon">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UNIT</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/html5-qrcode" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <!-- Авторизационная модалка -->
+  <div id="login-modal-overlay" class="modal-overlay"></div>
+  <div id="login-modal" class="modal">
+    <div class="modal-content show">
+      <h2>Авторизация</h2>
+      <input type="text" id="login-input" placeholder="Логин">
+      <input type="password" id="pass-input" placeholder="Пароль">
+      <button id="login-btn">Войти</button>
+      <div id="login-loader" class="loader hidden">
+        <div class="spinner"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay"></div>
+  <div class="page">
+    <header class="header">
+      <div class="header-container">
+        <div class="header-title">
+          <h1>Мониторинг рабочего времени сотрудников</h1>
+        </div>
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="scanner-card-wrapper">
+        <section class="scanner-section">
+          <div id="camera-loader" class="camera-loader hidden">
+            <div class="spinner"></div>
+          </div>
+          <div id="scanner"></div>
+        </section>
+
+        <section id="result" class="result-section hidden">
+          <h2 id="status">Ожидание сканирования...</h2>
+          <p id="time-record"></p>
+        </section>
+      </div>
+    </main>
+
+    <section class="history-section">
+      <div class="history-title">
+        <h2>Последние действия</h2>
+      </div>
+      <div class="table-wrapper">
+        <table id="history-table">
+          <thead>
+            <tr><th>ФИО</th><th>Дата</th><th>Время</th><th>Тип</th><th>Кто</th></tr>
+          </thead>
+          <tbody id="history-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- Модалка для ввода ФИО -->
+  <div id="modal-overlay" class="modal-overlay hidden"></div>
+  <div id="fio-modal" class="modal hidden">
+    <div class="modal-content hide">
+      <h2>Введите ФИО</h2>
+      <input type="text" id="fio-input" placeholder="Фамилия Имя Отчество">
+      <button id="submit-fio">Сохранить</button>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+</body>
+</html>
