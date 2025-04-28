@@ -113,7 +113,7 @@ function logAction(action, date) {
   })
   .then(() => {
     updateUI(action, date, time);
-    setTimeout(startScanner, 500);
+    setTimeout(startScanner, 50);
   })
   .catch(() => showToast('Ошибка соединения с сервером'));
 }
