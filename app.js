@@ -156,7 +156,7 @@ function showModalMessage(msg) {
   c.innerHTML = `<h2>${msg}</h2><button id="modal-ok">ОК</button>`;
   document.getElementById('modal-ok').onclick = () => {
     closeFioModal();
-    setTimeout(startScanner, 500);
+    setTimeout(startScanner, 1);
   };
 }
 
