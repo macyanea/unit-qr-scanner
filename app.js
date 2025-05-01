@@ -38,7 +38,7 @@ loginBtn.addEventListener('click', () => {
 
 // --- QR-сканер ---
 const html5QrCode  = new Html5Qrcode("scanner");
-const config       = { fps: 6, qrbox: { width: 200, height: 200 } };
+const config       = { fps: 6, qrbox: { width: 150, height: 150 } };
 const status       = document.getElementById('status');
 const timeRecord   = document.getElementById('time-record');
 const modalOverlay = document.getElementById('modal-overlay');
