@@ -7,7 +7,7 @@ const loginBtn          = document.getElementById('login-btn');
 const loginLoader       = document.getElementById('login-loader');
 let currentUser         = '';
 
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzHz209DXQjuseUn2ShOroxRfYYRgi1rBmWT6CocL8aED7ic4G68-H9PC_ZZjHyTLOt/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby_bSDf_c9a6xphcUhNJcL4RLGjxfCWvgYLsarhNzbApGnHIbHFpOr7fHEiLyjVhm9Q/exec';
 
 loginBtn.addEventListener('click', () => {
   const login = loginInput.value.trim();
@@ -36,9 +36,19 @@ loginBtn.addEventListener('click', () => {
     });
 });
 
+let selectedBlock = '';
+
+document.querySelectorAll('.block-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.block-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedBlock = btn.dataset.block;
+  });
+});
+
 // --- QR-сканер ---
 const html5QrCode  = new Html5Qrcode("scanner");
-const config       = { fps: 6, qrbox: { width: 200, height: 200 } };
+const config       = { fps: 6, qrbox: { width: 250, height: 250 } };
 const status       = document.getElementById('status');
 const timeRecord   = document.getElementById('time-record');
 const modalOverlay = document.getElementById('modal-overlay');
@@ -99,6 +109,10 @@ submitFioBtn.addEventListener('click', () => {
 });
 
 function logAction(action, date) {
+  if (!selectedBlock) {
+    showToast('Пожалуйста, выберите блок');
+    return;
+  }
   const time = new Date().toLocaleTimeString('ru-RU');
   fetch(GOOGLE_SCRIPT_URL, {
     method: 'POST',
@@ -108,12 +122,13 @@ function logAction(action, date) {
       date:        date,
       time:        time,
       action:      action,
-      who:         currentUser
+      who:         currentUser,
+      block:      selectedBlock
     })
   })
   .then(() => {
     updateUI(action, date, time);
-    setTimeout(startScanner, 1);
+    setTimeout(startScanner, 500);
   })
   .catch(() => showToast('Ошибка соединения с сервером'));
 }
@@ -125,13 +140,14 @@ function updateUI(action, date, time) {
   timeRecord.innerHTML = `<strong>Дата:</strong> ${date}<br>
                           <strong>Время:</strong> ${time}<br>
                           <strong>Тип:</strong> ${action}<br>
-                          <strong>Отсканировал:</strong> ${currentUser}`;
+                          <strong>Отсканировал:</strong> ${currentUser}<br>
+<strong>Блок:</strong> ${selectedBlock}`;
   const row = document.createElement('tr');
   row.innerHTML = `<td>${employeeName}</td>
                    <td>${date}</td>
                    <td>${time}</td>
                    <td>${action}</td>
-                   <td>${currentUser}</td>`;
+                   <td>${currentUser}</td><td>${selectedBlock}</td>`;
   historyBody.prepend(row);
   if (historyBody.rows.length > 5) historyBody.deleteRow(-1);
 }
@@ -156,7 +172,7 @@ function showModalMessage(msg) {
   c.innerHTML = `<h2>${msg}</h2><button id="modal-ok">ОК</button>`;
   document.getElementById('modal-ok').onclick = () => {
     closeFioModal();
-    setTimeout(startScanner, 1);
+    setTimeout(startScanner, 500);
   };
 }
 
