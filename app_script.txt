@@ -1,74 +1,120 @@
-// При открытии скрипта — сразу устанавливаем формат "Текст" на весь столбец C
 function onOpen() {
-  const sheet = getSheet();
-  // Столбец C:C — это ячейка с датой
+  const sheet = getLogSheet();
   sheet.getRange('C:C').setNumberFormat('@STRING@');
 }
 
-// Утилита — получаем первый лист
-function getSheet() {
+function getLogSheet() {
   return SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
 }
 
-// Обработчик GET: возвращает { exists, name, scans }
-function doGet(e) {
-  const empId = String(e.parameter.employeeId  || '');
-  const date  = String(e.parameter.date        || '');
-  const sheet = getSheet();
-  const lastRow = sheet.getLastRow();
-  
-  if (lastRow < 2) {
-    return createJsonOutput({ exists: false, name: '', scans: 0 });
-  }
-  
-  const all = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
-  const firstMatch = all.find(r => String(r[0]) === empId);
-  const exists = !!firstMatch;
-  const name   = exists ? firstMatch[1] : '';
-  
-  let scans = 0;
-  if (date) {
-    scans = all.filter(r =>
-      String(r[0]) === empId &&
-      String(r[2]) === date
-    ).length;
-  }
-  
-  return createJsonOutput({ exists, name, scans });
+function getUsersSheet() {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheets()[1];
 }
 
-// Обработчик POST: добавляет новую строку и гарантирует текстовый формат колонки C
+function doGet(e) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Logs");
+  const empId = e.parameter.employeeId;
+  const login = e.parameter.login;
+  const password = e.parameter.password;
+  const date = e.parameter.date;
+
+  // Авторизация
+  if (login && password) {
+    const users = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users").getDataRange().getValues();
+    const valid = users.some(r => r[0] === login && r[1] === password);
+    return ContentService.createTextOutput(JSON.stringify({ auth: valid }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (!empId || !date) {
+    return ContentService.createTextOutput(JSON.stringify({ error: "Missing parameters" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  const data = sheet.getDataRange().getValues();
+  const matches = data.filter(row => row[0] === empId && row[2] === date);
+  const scans = matches.length;
+
+  let lastTime = '';
+  let name = '';
+  if (scans > 0) {
+    const lastEntry = matches[matches.length - 1];
+
+    const dateCell = lastEntry[2];
+    const timeCell = lastEntry[3];
+    const tz = Session.getScriptTimeZone();
+
+    const dateStr = (dateCell instanceof Date)
+      ? Utilities.formatDate(dateCell, tz, "dd.MM.yyyy")
+      : String(dateCell);
+
+    const timeStr = (timeCell instanceof Date)
+      ? Utilities.formatDate(timeCell, tz, "HH:mm:ss")
+      : String(timeCell);
+
+    lastTime = `${dateStr} ${timeStr}`;
+    name = lastEntry[1];
+  }
+
+  const response = {
+    exists: scans > 0,
+    name: name,
+    scans: scans,
+    lastTime: lastTime
+  };
+
+  return ContentService.createTextOutput(JSON.stringify(response))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Logs");
+
+  const empId = e.parameter.employeeId;
+  const fullName = e.parameter.fullName;
+  const date = e.parameter.date;
+  const time = e.parameter.time;
+  const action = e.parameter.action;
+  const who = e.parameter.who;
+  const block = e.parameter.block;
+
+  sheet.appendRow([empId, fullName, date, time, action, who, block]);
+
+  return ContentService.createTextOutput(JSON.stringify({ success: true }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+
 function doPost(e) {
   const empId  = String(e.parameter.employeeId || '');
-  let name     = String(e.parameter.fullName    || '');
+  let fullName = String(e.parameter.fullName    || '');
   const date   = String(e.parameter.date        || '');
   const time   = String(e.parameter.time        || '');
   const action = String(e.parameter.action      || '');
+  const who    = String(e.parameter.who         || '');
+  const block  = String(e.parameter.block       || '');
 
-  const sheet   = getSheet();
+  const sheet = getLogSheet();
   const lastRow = sheet.getLastRow();
-  
-  // Подхватываем ФИО, если уже было
   if (lastRow >= 2) {
-    const prev = sheet.getRange(2, 1, lastRow - 1, 2)
-                      .getValues()
-                      .find(r => String(r[0]) === empId);
-    if (prev) name = prev[1];
+    const prev = sheet.getRange(2, 1, lastRow - 1, 2).getValues().find(r => String(r[0]) === empId);
+    if (prev) fullName = prev[1];
   }
-  
-  // Добавляем строку
-  sheet.appendRow([empId, name, date, time, action]);
-  
-  // После добавления устанавливаем текстовый формат для ячейки с датой
+
+  sheet.appendRow([empId, fullName, date, time, action, who, block]);
   const newRow = sheet.getLastRow();
   sheet.getRange(newRow, 3).setNumberFormat('@STRING@');
-  
+
   return createJsonOutput({ status: 'ok' });
 }
 
-// Помощник для JSON-ответа
+function auth(login, password) {
+  const sheet = getUsersSheet();
+  const data  = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+  const ok    = data.some(r => String(r[0]) === login && String(r[1]) === password);
+  return createJsonOutput({ auth: ok });
+}
+
 function createJsonOutput(obj) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
