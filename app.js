@@ -1,20 +1,17 @@
-// --- Авторизация ---
 const loginModalOverlay = document.getElementById('login-modal-overlay');
-const loginModal        = document.getElementById('login-modal');
-const loginInput        = document.getElementById('login-input');
-const passInput         = document.getElementById('pass-input');
-const loginBtn          = document.getElementById('login-btn');
-const loginLoader       = document.getElementById('login-loader');
-let currentUser         = '';
+const loginModal = document.getElementById('login-modal');
+const loginInput = document.getElementById('login-input');
+const passInput = document.getElementById('pass-input');
+const loginBtn = document.getElementById('login-btn');
+const loginLoader = document.getElementById('login-loader');
+let currentUser = '';
 
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbydMBdwLOd5m_s2XBzZCMVAUGaoBs9Zsu5hIBTUPeKb2Uo9PQl3z_DoZjfiJJu6yYwB/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxgbYCHMxZ2BJ4ZQK9GF76-kR6XshjFFYtuf6dnITeA3MVz0nLf2FXr29KGHp_nlxoy/exec';
 
 loginBtn.addEventListener('click', () => {
   const login = loginInput.value.trim();
-  const pass  = passInput.value.trim();
+  const pass = passInput.value.trim();
   if (!login || !pass) return alert('Введите логин и пароль');
-
-  // Показать лоадер под кнопкой
   loginLoader.classList.remove('hidden');
 
   fetch(`${GOOGLE_SCRIPT_URL}?login=${encodeURIComponent(login)}&password=${encodeURIComponent(pass)}`)
@@ -30,32 +27,33 @@ loginBtn.addEventListener('click', () => {
       }
     })
     .catch(() => alert('Ошибка авторизации'))
-    .finally(() => {
-      // Скрыть лоадер
-      loginLoader.classList.add('hidden');
-    });
+    .finally(() => loginLoader.classList.add('hidden'));
 });
 
-let selectedBlock = '';
+let selectedBlocks = [];
 
 document.querySelectorAll('.block-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.block-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    selectedBlock = btn.dataset.block;
+    const block = btn.dataset.block;
+    if (selectedBlocks.includes(block)) {
+      selectedBlocks = selectedBlocks.filter(b => b !== block);
+      btn.classList.remove('active');
+    } else {
+      selectedBlocks.push(block);
+      btn.classList.add('active');
+    }
   });
 });
 
-// --- QR-сканер ---
-const html5QrCode  = new Html5Qrcode("scanner");
-const config       = { fps: 6, qrbox: { width: 250, height: 250 } };
-const status       = document.getElementById('status');
-const timeRecord   = document.getElementById('time-record');
+const html5QrCode = new Html5Qrcode("scanner");
+const config = { fps: 6, qrbox: { width: 250, height: 250 } };
+const status = document.getElementById('status');
+const timeRecord = document.getElementById('time-record');
 const modalOverlay = document.getElementById('modal-overlay');
-const fioModal     = document.getElementById('fio-modal');
-const fioInput     = document.getElementById('fio-input');
+const fioModal = document.getElementById('fio-modal');
+const fioInput = document.getElementById('fio-input');
 const submitFioBtn = document.getElementById('submit-fio');
-const historyBody  = document.getElementById('history-body');
+const historyBody = document.getElementById('history-body');
 const cameraLoader = document.getElementById('camera-loader');
 
 function showCameraLoader() { cameraLoader.classList.remove('hidden'); }
@@ -65,7 +63,10 @@ function startScanner() {
   showCameraLoader();
   html5QrCode.start({ facingMode: "environment" }, config, qrSuccess)
     .then(hideCameraLoader)
-    .catch(() => { hideCameraLoader(); showToast('Не удалось запустить камеру'); });
+    .catch(() => {
+      hideCameraLoader();
+      showToast('Не удалось запустить камеру');
+    });
 }
 
 function qrSuccess(decodedText) {
@@ -75,28 +76,75 @@ function qrSuccess(decodedText) {
 }
 
 let scannedEmployeeId = '';
-let employeeName      = '';
+let employeeName = '';
 
 function handleScan(id) {
   scannedEmployeeId = id;
-  const now     = new Date();
+  const now = new Date();
   const rawDate = now.toLocaleDateString('ru-RU');
-  const date    = encodeURIComponent(rawDate);
+  const date = encodeURIComponent(rawDate);
 
   fetch(`${GOOGLE_SCRIPT_URL}?employeeId=${id}&date=${date}`)
     .then(r => r.json())
     .then(data => {
       hideCameraLoader();
+
       if (!data.exists) {
         openFioModal();
       } else {
         employeeName = data.name;
-        if (data.scans === 0)      logAction('Вход', rawDate);
-        else if (data.scans === 1) logAction('Выход', rawDate);
-        else                       showModalMessage('Этот сотрудник уже совершил вход/выход');
+
+        if (data.scans === 0) {
+          logAction('Вход', rawDate);
+        } else if (data.scans === 1) {
+          const lastTime = data.lastTime;
+          if (!lastTime || !lastTime.includes(' ')) {
+            showToast('Ошибка: неверный формат времени входа');
+            setTimeout(startScanner, 2000);
+            return;
+          }
+
+          const cleanedTime = lastTime.replace(/\s+/g, ' ').trim();
+          const [datePart, timePart] = cleanedTime.split(' ');
+          const [day, month, year] = datePart.split('.').map(Number);
+          const [hour, minute, second = 0] = timePart.split(':').map(Number);
+          const entryDate = new Date(year, month - 1, day, hour, minute, second);
+
+          if (isNaN(entryDate.getTime())) {
+            showToast('Ошибка: некорректное время входа');
+            setTimeout(startScanner, 2000);
+            return;
+          }
+
+          const nowDateStr = now.toLocaleDateString('ru-RU');
+          const entryDateStr = `${String(day).padStart(2, '0')}.${String(month).padStart(2, '0')}.${year}`;
+          const isSameDay = nowDateStr === entryDateStr;
+
+          if (!isSameDay) {
+            showToast('Выход невозможен: вход был выполнен в другой день');
+            setTimeout(startScanner, 1500);
+            return;
+          }
+
+          const diffMs = now.getTime() - entryDate.getTime();
+          const diffMinutes = Math.floor(diffMs / 60000);
+
+          if (diffMinutes < 30) {
+            showToast(`Выход возможен только через 30 минут после входа. Осталось: ${30 - diffMinutes} мин.`);
+            setTimeout(startScanner, 1500);
+            return;
+          }
+
+          logAction('Выход', rawDate);
+        } else {
+          showModalMessage('Этот сотрудник уже совершил вход/выход');
+        }
       }
     })
-    .catch(() => { hideCameraLoader(); showToast('Ошибка соединения с сервером'); });
+    .catch(() => {
+      hideCameraLoader();
+      showToast('Ошибка соединения с сервером');
+    });
 }
 
 submitFioBtn.addEventListener('click', () => {
@@ -109,45 +157,48 @@ submitFioBtn.addEventListener('click', () => {
 });
 
 function logAction(action, date) {
-  if (!selectedBlock) {
-    showToast('Пожалуйста, выберите блок');
+  if (selectedBlocks.length === 0) {
+    showToast('Пожалуйста, выберите хотя бы один блок');
     return;
   }
+
+  const blockString = selectedBlocks.join(', ');
   const time = new Date().toLocaleTimeString('ru-RU');
+
   fetch(GOOGLE_SCRIPT_URL, {
     method: 'POST',
     body: new URLSearchParams({
       employeeId: scannedEmployeeId,
-      fullName:    employeeName,
-      date:        date,
-      time:        time,
-      action:      action,
-      who:         currentUser,
-      block:      selectedBlock
+      fullName: employeeName,
+      date: date,
+      time: time,
+      action: action,
+      who: currentUser,
+      block: blockString
     })
   })
-  .then(() => {
-    updateUI(action, date, time);
-    setTimeout(startScanner, 500);
-  })
-  .catch(() => showToast('Ошибка соединения с сервером'));
+    .then(() => {
+      updateUI(action, date, time, blockString);
+      setTimeout(startScanner, 500);
+    })
+    .catch(() => showToast('Ошибка соединения с сервером'));
 }
 
-// --- UI-функции ---
-function updateUI(action, date, time) {
+function updateUI(action, date, time, blockString) {
   document.getElementById('result').classList.remove('hidden');
   status.textContent = `${employeeName} — ${action}`;
   timeRecord.innerHTML = `<strong>Дата:</strong> ${date}<br>
                           <strong>Время:</strong> ${time}<br>
                           <strong>Тип:</strong> ${action}<br>
                           <strong>Отсканировал:</strong> ${currentUser}<br>
-<strong>Блок:</strong> ${selectedBlock}`;
+                          <strong>Блок:</strong> ${blockString}<br>`;
   const row = document.createElement('tr');
   row.innerHTML = `<td>${employeeName}</td>
                    <td>${date}</td>
                    <td>${time}</td>
                    <td>${action}</td>
-                   <td>${currentUser}</td><td>${selectedBlock}</td>`;
+                   <td>${currentUser}</td>
+                   <td>${blockString}</td>`;
   historyBody.prepend(row);
   if (historyBody.rows.length > 5) historyBody.deleteRow(-1);
 }
@@ -155,11 +206,12 @@ function updateUI(action, date, time) {
 function openFioModal() {
   modalOverlay.classList.remove('hidden');
   fioModal.classList.remove('hidden');
-  fioModal.querySelector('.modal-content').classList.replace('hide','show');
+  fioModal.querySelector('.modal-content').classList.replace('hide', 'show');
 }
+
 function closeFioModal() {
   const c = fioModal.querySelector('.modal-content');
-  c.classList.replace('show','hide');
+  c.classList.replace('show', 'hide');
   setTimeout(() => {
     modalOverlay.classList.add('hidden');
     fioModal.classList.add('hidden');
