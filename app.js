@@ -100,7 +100,7 @@ function handleScan(id) {
           const lastTime = data.lastTime;
           if (!lastTime || !lastTime.includes(' ')) {
             showToast('Ошибка: неверный формат времени входа');
-            setTimeout(startScanner, 2000);
+            setTimeout(startScanner, 10);
             return;
           }
 
@@ -112,7 +112,7 @@ function handleScan(id) {
 
           if (isNaN(entryDate.getTime())) {
             showToast('Ошибка: некорректное время входа');
-            setTimeout(startScanner, 2000);
+            setTimeout(startScanner, 10);
             return;
           }
 
@@ -122,7 +122,7 @@ function handleScan(id) {
 
           if (!isSameDay) {
             showToast('Выход невозможен: вход был выполнен в другой день');
-            setTimeout(startScanner, 1500);
+            setTimeout(startScanner, 10);
             return;
           }
 
@@ -131,7 +131,7 @@ function handleScan(id) {
 
           if (diffMinutes < 30) {
             showToast(`Выход возможен только через 30 минут после входа. Осталось: ${30 - diffMinutes} мин.`);
-            setTimeout(startScanner, 1500);
+            setTimeout(startScanner, 10);
             return;
           }
 
@@ -179,7 +179,7 @@ function logAction(action, date) {
   })
     .then(() => {
       updateUI(action, date, time, blockString);
-      setTimeout(startScanner, 500);
+      setTimeout(startScanner, 10);
     })
     .catch(() => showToast('Ошибка соединения с сервером'));
 }
@@ -224,7 +224,7 @@ function showModalMessage(msg) {
   c.innerHTML = `<h2>${msg}</h2><button id="modal-ok">ОК</button>`;
   document.getElementById('modal-ok').onclick = () => {
     closeFioModal();
-    setTimeout(startScanner, 500);
+    setTimeout(startScanner, 10);
   };
 }
 
