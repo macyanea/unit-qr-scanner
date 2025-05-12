@@ -12,17 +12,58 @@ let currentUser = '';
 
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyCl5cRUntHUkacafY79UMos8XKJepO9ipYpk7jbM4qKeFj1CiqVK0_YeFQoVU4tOui/exec';
 
+// === ДОБАВИМ поддержку кэшированной авторизации ===
+
+// Ключ для localStorage
+const LOCAL_AUTH_KEY = 'unit-auth';
+
+function saveOfflineAuth(login, pass) {
+  localStorage.setItem(LOCAL_AUTH_KEY, JSON.stringify({ login, pass }));
+}
+
+function getOfflineAuth() {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_AUTH_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function isOnline() {
+  return navigator.onLine;
+}
+
+// === ЗАМЕНИТЬ авторизацию по кнопке loginBtn ===
 loginBtn.addEventListener('click', () => {
   const login = loginInput.value.trim();
   const pass = passInput.value.trim();
-  if (!login || !pass) return alert('Введите логин и пароль');
+  if (!login || !pass) {
+    alert('Введите логин и пароль');
+    return;
+  }
   loginLoader.classList.remove('hidden');
+
+  if (!isOnline()) {
+    // Попытка офлайн-авторизации
+    const saved = getOfflineAuth();
+    if (saved && saved.login === login && saved.pass === pass) {
+      currentUser = login;
+      loginModalOverlay.classList.add('hidden');
+      loginModal.classList.add('hidden');
+      startScanner();
+    } else {
+      alert('Нет соединения. Вход невозможен.');
+    }
+    loginLoader.classList.add('hidden');
+    return;
+  }
 
   fetch(`${GOOGLE_SCRIPT_URL}?login=${encodeURIComponent(login)}&password=${encodeURIComponent(pass)}`)
     .then(r => r.json())
     .then(data => {
       if (data.auth) {
         currentUser = login;
+        saveOfflineAuth(login, pass); // Сохраняем для офлайн-доступа
         loginModalOverlay.classList.add('hidden');
         loginModal.classList.add('hidden');
         startScanner();
@@ -30,6 +71,9 @@ loginBtn.addEventListener('click', () => {
         alert('Неверный логин или пароль');
       }
     })
+    .catch(() => alert('Ошибка авторизации'))
+    .finally(() => loginLoader.classList.add('hidden'));
+});
     .catch(() => alert('Ошибка авторизации'))
     .finally(() => loginLoader.classList.add('hidden'));
 });
