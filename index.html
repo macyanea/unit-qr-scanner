@@ -6,6 +6,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>UNIT</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(() => console.log('Service Worker зарегистрирован'))
+        .catch(err => console.error('Ошибка регистрации Service Worker:', err));
+    }
+  </script>
   <script src="https://unpkg.com/html5-qrcode" defer></script>
   <script src="app.js" defer></script>
 </head>
@@ -41,21 +49,12 @@
             <div class="spinner"></div>
           </div>
           <div id="scanner"></div>
-            <!-- ваш оверлей-рамка -->
-  <div id="scanner-frame" class="scanner-frame"></div>
-  <!-- оверлей-пауза + спиннер -->
-  <div id="scanner-pause-overlay" class="scanner-pause hidden">
-    <div class="scanner-spinner"></div>
-  </div>
-
-
-          <!-- Overlay loader вместо "Scanner paused" -->
+          <div id="scanner-frame" class="scanner-frame"></div>
           <div id="scanner-pause-overlay" class="scanner-pause hidden">
             <div class="scanner-spinner"></div>
           </div>
         </section>
 
-        <!-- Контейнер выбора блока -->
         <div id="block-selector" class="block-selector">
           <button class="block-btn" data-block="3">3</button>
           <button class="block-btn" data-block="3a">3а</button>
@@ -83,7 +82,6 @@
     </section>
   </div>
 
-  <!-- Модалка ввода ФИО -->
   <div id="modal-overlay" class="modal-overlay hidden"></div>
   <div id="fio-modal" class="modal hidden">
     <div class="modal-content hide">
