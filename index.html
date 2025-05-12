@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -42,17 +41,29 @@
             <div class="spinner"></div>
           </div>
           <div id="scanner"></div>
+            <!-- ваш оверлей-рамка -->
+  <div id="scanner-frame" class="scanner-frame"></div>
+  <!-- оверлей-пауза + спиннер -->
+  <div id="scanner-pause-overlay" class="scanner-pause hidden">
+    <div class="scanner-spinner"></div>
+  </div>
+
+
+          <!-- Overlay loader вместо "Scanner paused" -->
+          <div id="scanner-pause-overlay" class="scanner-pause hidden">
+            <div class="scanner-spinner"></div>
+          </div>
         </section>
 
-<!-- Контейнер выбора блока -->
-<div id="block-selector" class="block-selector">
-  <button class="block-btn" data-block="3">3</button>
-  <button class="block-btn" data-block="3a">3а</button>
-  <button class="block-btn" data-block="4">4</button>
-  <button class="block-btn" data-block="4a">4а</button>
-  <button class="block-btn" data-block="7">7</button>
-  <button class="block-btn" data-block="8">8</button>
-</div>
+        <!-- Контейнер выбора блока -->
+        <div id="block-selector" class="block-selector">
+          <button class="block-btn" data-block="3">3</button>
+          <button class="block-btn" data-block="3a">3а</button>
+          <button class="block-btn" data-block="4">4</button>
+          <button class="block-btn" data-block="4a">4а</button>
+          <button class="block-btn" data-block="7">7</button>
+          <button class="block-btn" data-block="8">8</button>
+        </div>
 
         <section id="result" class="result-section hidden">
           <h2 id="status">Ожидание сканирования...</h2>
@@ -62,21 +73,17 @@
     </main>
 
     <section class="history-section">
-      <div class="history-title">
-        <h2>Последние действия</h2>
-      </div>
+      <div class="history-title"><h2>Последние действия</h2></div>
       <div class="table-wrapper">
         <table id="history-table">
-          <thead>
-            <tr><th>ФИО</th><th>Дата</th><th>Время</th><th>Тип</th><th>Кто</th><th>Блок</th></tr>
-          </thead>
+          <thead><tr><th>ФИО</th><th>Дата</th><th>Время</th><th>Тип</th><th>Кто</th><th>Блок</th></tr></thead>
           <tbody id="history-body"></tbody>
         </table>
       </div>
     </section>
   </div>
 
-  <!-- Модалка для ввода ФИО -->
+  <!-- Модалка ввода ФИО -->
   <div id="modal-overlay" class="modal-overlay hidden"></div>
   <div id="fio-modal" class="modal hidden">
     <div class="modal-content hide">
