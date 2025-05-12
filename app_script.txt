@@ -1,45 +1,58 @@
+// ====================================
+// Автоматическая настройка формата колонки даты (C) и блока (G) теперь прямо в doPost()
+// ====================================
 function onOpen() {
   const sheet = getLogSheet();
   sheet.getRange('C:C').setNumberFormat('@STRING@');
 }
 
+// ====================================
+// Утилиты для доступа к таблицам
+// ====================================
 function getLogSheet() {
-  return SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Logs");
 }
 
 function getUsersSheet() {
-  return SpreadsheetApp.getActiveSpreadsheet().getSheets()[1];
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
 }
 
+// ====================================
+// Обработка GET-запроса (авторизация и проверка последнего входа)
+// ====================================
 function doGet(e) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Logs");
-  const empId = e.parameter.employeeId;
+  const sheet = getLogSheet();
+  const empId = String(e.parameter.employeeId || '').trim();
   const login = e.parameter.login;
   const password = e.parameter.password;
-  const date = e.parameter.date;
+  const date = String(e.parameter.date || '').trim();
 
-  // Авторизация
   if (login && password) {
-    const users = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users").getDataRange().getValues();
-    const valid = users.some(r => r[0] === login && r[1] === password);
-    return ContentService.createTextOutput(JSON.stringify({ auth: valid }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return auth(login, password);
   }
 
   if (!empId || !date) {
-    return ContentService.createTextOutput(JSON.stringify({ error: "Missing parameters" }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return createJsonOutput({ error: "Missing parameters" });
   }
 
   const data = sheet.getDataRange().getValues();
-  const matches = data.filter(row => row[0] === empId && row[2] === date);
-  const scans = matches.length;
 
+  const nameEntry = data.find(row =>
+    String(row[0]).trim() === empId &&
+    String(row[1]).trim() !== ''
+  );
+  const name = nameEntry ? String(nameEntry[1]).trim() : '';
+
+  const matchesToday = data.filter(row =>
+    String(row[0]).trim() === empId &&
+    String(row[2]).trim() === date
+  );
+
+  const scans = matchesToday.length;
   let lastTime = '';
-  let name = '';
-  if (scans > 0) {
-    const lastEntry = matches[matches.length - 1];
 
+  if (scans > 0) {
+    const lastEntry = matchesToday[matchesToday.length - 1];
     const dateCell = lastEntry[2];
     const timeCell = lastEntry[3];
     const tz = Session.getScriptTimeZone();
@@ -53,68 +66,63 @@ function doGet(e) {
       : String(timeCell);
 
     lastTime = `${dateStr} ${timeStr}`;
-    name = lastEntry[1];
   }
 
-  const response = {
+  return createJsonOutput({
     exists: scans > 0,
     name: name,
     scans: scans,
     lastTime: lastTime
-  };
-
-  return ContentService.createTextOutput(JSON.stringify(response))
-    .setMimeType(ContentService.MimeType.JSON);
+  });
 }
 
+// ====================================
+// Обработка POST-запроса (добавление новой записи)
+// ====================================
 function doPost(e) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Logs");
-
-  const empId = e.parameter.employeeId;
-  const fullName = e.parameter.fullName;
-  const date = e.parameter.date;
-  const time = e.parameter.time;
-  const action = e.parameter.action;
-  const who = e.parameter.who;
-  const block = e.parameter.block;
-
-  sheet.appendRow([empId, fullName, date, time, action, who, block]);
-
-  return ContentService.createTextOutput(JSON.stringify({ success: true }))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-
-function doPost(e) {
-  const empId  = String(e.parameter.employeeId || '');
-  let fullName = String(e.parameter.fullName    || '');
-  const date   = String(e.parameter.date        || '');
-  const time   = String(e.parameter.time        || '');
-  const action = String(e.parameter.action      || '');
-  const who    = String(e.parameter.who         || '');
-  const block  = String(e.parameter.block       || '');
+  const empId  = String(e.parameter.employeeId || '').trim();
+  let fullName = String(e.parameter.fullName || '').trim();
+  const date   = String(e.parameter.date || '').trim();
+  const time   = String(e.parameter.time || '').trim();
+  const action = String(e.parameter.action || '').trim();
+  const who    = String(e.parameter.who || '').trim();
+  const block  = String(e.parameter.block || '').trim();
 
   const sheet = getLogSheet();
-  const lastRow = sheet.getLastRow();
-  if (lastRow >= 2) {
-    const prev = sheet.getRange(2, 1, lastRow - 1, 2).getValues().find(r => String(r[0]) === empId);
-    if (prev) fullName = prev[1];
+
+  if (!fullName) {
+    const data = sheet.getDataRange().getValues();
+    const existing = data.find(r =>
+      String(r[0]).trim() === empId &&
+      String(r[1]).trim() !== ''
+    );
+    if (existing) fullName = String(existing[1]).trim();
   }
 
   sheet.appendRow([empId, fullName, date, time, action, who, block]);
-  const newRow = sheet.getLastRow();
-  sheet.getRange(newRow, 3).setNumberFormat('@STRING@');
+
+  // Устанавливаем формат колонки C (дата) и G (блок) как текст
+  const lastRow = sheet.getLastRow();
+  sheet.getRange(lastRow, 3).setNumberFormat('@STRING@'); // дата
+  sheet.getRange(lastRow, 7).setNumberFormat('@STRING@'); // блок
 
   return createJsonOutput({ status: 'ok' });
 }
 
+// ====================================
+// Авторизация по Users-листу
+// ====================================
 function auth(login, password) {
   const sheet = getUsersSheet();
-  const data  = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
-  const ok    = data.some(r => String(r[0]) === login && String(r[1]) === password);
+  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+  const ok = data.some(r => String(r[0]) === login && String(r[1]) === password);
   return createJsonOutput({ auth: ok });
 }
 
+// ====================================
+// Универсальный JSON-ответ
+// ====================================
 function createJsonOutput(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }
