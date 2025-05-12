@@ -47,7 +47,7 @@ document.querySelectorAll('.block-btn').forEach(btn => {
 
 // Настройка сканера
 const html5QrCode = new Html5Qrcode("scanner");
-const config = { fps: 6, qrbox: { width: 250, height: 250 } };
+const config = { fps: 6, qrbox: { width: 200, height: 200 } };
 const status = document.getElementById('status');
 const timeRecord = document.getElementById('time-record');
 const modalOverlay = document.getElementById('modal-overlay');
