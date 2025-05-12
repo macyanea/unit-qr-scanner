@@ -1,3 +1,5 @@
+// === app.js ===
+
 const loginModalOverlay = document.getElementById('login-modal-overlay');
 const loginModal = document.getElementById('login-modal');
 const loginInput = document.getElementById('login-input');
@@ -6,7 +8,7 @@ const loginBtn = document.getElementById('login-btn');
 const loginLoader = document.getElementById('login-loader');
 let currentUser = '';
 
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxgbYCHMxZ2BJ4ZQK9GF76-kR6XshjFFYtuf6dnITeA3MVz0nLf2FXr29KGHp_nlxoy/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzaWsTv8M-bDD3FBHk0JBp3_ffmuAKR21HpbC7gfh-x7MjtdcSmvLEMH4cSID_Eel17/exec';
 
 loginBtn.addEventListener('click', () => {
   const login = loginInput.value.trim();
@@ -30,20 +32,18 @@ loginBtn.addEventListener('click', () => {
     .finally(() => loginLoader.classList.add('hidden'));
 });
 
-let selectedBlocks = [];
 
+let selectedBlocks = [];
 document.querySelectorAll('.block-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    const block = btn.dataset.block;
-    if (selectedBlocks.includes(block)) {
-      selectedBlocks = selectedBlocks.filter(b => b !== block);
-      btn.classList.remove('active');
-    } else {
-      selectedBlocks.push(block);
-      btn.classList.add('active');
-    }
+    // Сбросить активность всех кнопок
+    document.querySelectorAll('.block-btn').forEach(b => b.classList.remove('active'));
+    selectedBlocks = [btn.dataset.block];
+    btn.classList.add('active');
+    console.log('Выбран блок:', selectedBlocks[0]);
   });
 });
+
 
 const html5QrCode = new Html5Qrcode("scanner");
 const config = { fps: 6, qrbox: { width: 250, height: 250 } };
@@ -89,56 +89,58 @@ function handleScan(id) {
     .then(data => {
       hideCameraLoader();
 
-      if (!data.exists) {
+      // ✅ Проверка ТОЛЬКО на отсутствие имени
+      if (!data.name || data.name.trim() === '') {
         openFioModal();
-      } else {
-        employeeName = data.name;
+        return;
+      }
 
-        if (data.scans === 0) {
-          logAction('Вход', rawDate);
-        } else if (data.scans === 1) {
-          const lastTime = data.lastTime;
-          if (!lastTime || !lastTime.includes(' ')) {
-            showToast('Ошибка: неверный формат времени входа');
-            setTimeout(startScanner, 10);
-            return;
-          }
+      employeeName = data.name.trim();
 
-          const cleanedTime = lastTime.replace(/\s+/g, ' ').trim();
-          const [datePart, timePart] = cleanedTime.split(' ');
-          const [day, month, year] = datePart.split('.').map(Number);
-          const [hour, minute, second = 0] = timePart.split(':').map(Number);
-          const entryDate = new Date(year, month - 1, day, hour, minute, second);
-
-          if (isNaN(entryDate.getTime())) {
-            showToast('Ошибка: некорректное время входа');
-            setTimeout(startScanner, 10);
-            return;
-          }
-
-          const nowDateStr = now.toLocaleDateString('ru-RU');
-          const entryDateStr = `${String(day).padStart(2, '0')}.${String(month).padStart(2, '0')}.${year}`;
-          const isSameDay = nowDateStr === entryDateStr;
-
-          if (!isSameDay) {
-            showToast('Выход невозможен: вход был выполнен в другой день');
-            setTimeout(startScanner, 10);
-            return;
-          }
-
-          const diffMs = now.getTime() - entryDate.getTime();
-          const diffMinutes = Math.floor(diffMs / 60000);
-
-          if (diffMinutes < 30) {
-            showToast(`Выход возможен только через 30 минут после входа. Осталось: ${30 - diffMinutes} мин.`);
-            setTimeout(startScanner, 10);
-            return;
-          }
-
-          logAction('Выход', rawDate);
-        } else {
-          showModalMessage('Этот сотрудник уже совершил вход/выход');
+      if (data.scans === 0) {
+        logAction('Вход', rawDate);
+      } else if (data.scans === 1) {
+        const lastTime = data.lastTime;
+        if (!lastTime || !lastTime.includes(' ')) {
+          showToast('Ошибка: неверный формат времени входа');
+          setTimeout(startScanner, 20);
+          return;
         }
+
+        const cleanedTime = lastTime.replace(/\s+/g, ' ').trim();
+        const [datePart, timePart] = cleanedTime.split(' ');
+        const [day, month, year] = datePart.split('.').map(Number);
+        const [hour, minute, second = 0] = timePart.split(':').map(Number);
+        const entryDate = new Date(year, month - 1, day, hour, minute, second);
+
+        if (isNaN(entryDate.getTime())) {
+          showToast('Ошибка: некорректное время входа');
+          setTimeout(startScanner, 20);
+          return;
+        }
+
+        const nowDateStr = now.toLocaleDateString('ru-RU');
+        const entryDateStr = `${String(day).padStart(2, '0')}.${String(month).padStart(2, '0')}.${year}`;
+        const isSameDay = nowDateStr === entryDateStr;
+
+        if (!isSameDay) {
+          showToast('Выход невозможен: вход был выполнен в другой день');
+          setTimeout(startScanner, 20);
+          return;
+        }
+
+        const diffMs = now.getTime() - entryDate.getTime();
+        const diffMinutes = Math.floor(diffMs / 60000);
+
+        if (diffMinutes < 30) {
+          showToast(`Выход возможен только через 30 минут после входа. Осталось: ${30 - diffMinutes} мин.`);
+          setTimeout(startScanner, 20);
+          return;
+        }
+
+        logAction('Выход', rawDate);
+      } else {
+        showModalMessage('Этот сотрудник уже совершил вход/выход');
       }
     })
     .catch(() => {
@@ -179,7 +181,7 @@ function logAction(action, date) {
   })
     .then(() => {
       updateUI(action, date, time, blockString);
-      setTimeout(startScanner, 10);
+      setTimeout(startScanner, 20);
     })
     .catch(() => showToast('Ошибка соединения с сервером'));
 }
@@ -224,7 +226,7 @@ function showModalMessage(msg) {
   c.innerHTML = `<h2>${msg}</h2><button id="modal-ok">ОК</button>`;
   document.getElementById('modal-ok').onclick = () => {
     closeFioModal();
-    setTimeout(startScanner, 10);
+    setTimeout(startScanner, 20);
   };
 }
 
