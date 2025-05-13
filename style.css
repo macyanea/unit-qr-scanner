@@ -1,0 +1,57 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  background: #0a0a14;
+  font-family: 'Poppins', sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  overflow: hidden;
+}
+
+#scanner {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #000;
+  z-index: 1;
+}
+
+#camera {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+  background-color: #000;
+  position: relative;
+  z-index: 2;
+}
+
+#qr-canvas {
+  display: none;
+}
+
+.toast {
+  position: fixed;
+  bottom: env(safe-area-inset-bottom, 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.8);
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 10px;
+  z-index: 9999;
+  font-size: 16px;
+}
+
+.hidden {
+  display: none !important;
+}
