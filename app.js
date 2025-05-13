@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/ВАШ_ID/exec';
+  const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw8lwqgrDlhKTx6Sz0uYq39duz7oBjRY_i_gHtAzNFPwJpTuBG3pA_8_oaaQZtbdcq2kA/exec';
 
   const loginModalOverlay = document.getElementById('login-modal-overlay');
   const loginModal = document.getElementById('login-modal');
