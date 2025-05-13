@@ -1,17 +1,34 @@
-// === app.js ===
+// === app.js (рефакторинг) ===
 
-// Авторизация
+// --- Константы и переменные ---
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw8lwqgrDlhKTx6Sz0uYq39duz7oBjRY_i_gHtAzNFPwJpTuBG3pA_8_oaaQZtbdcq2kA/exec';
+
 const loginModalOverlay = document.getElementById('login-modal-overlay');
 const loginModal = document.getElementById('login-modal');
 const loginInput = document.getElementById('login-input');
 const passInput = document.getElementById('pass-input');
 const loginBtn = document.getElementById('login-btn');
 const loginLoader = document.getElementById('login-loader');
+
+const html5QrCode = new Html5Qrcode("scanner");
+const config = { fps: 6, qrbox: { width: 250, height: 250 } };
+const status = document.getElementById('status');
+const timeRecord = document.getElementById('time-record');
+const modalOverlay = document.getElementById('modal-overlay');
+const fioModal = document.getElementById('fio-modal');
+const fioInput = document.getElementById('fio-input');
+const submitFioBtn = document.getElementById('submit-fio');
+const historyBody = document.getElementById('history-body');
+const cameraLoader = document.getElementById('camera-loader');
+const scannerPauseOverlay = document.getElementById('scanner-pause-overlay');
+
 let currentUser = '';
+let employeeName = '';
+let scannedEmployeeId = '';
+let scannerStarted = false;
+let selectedBlocks = [];
 
-
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyCl5cRUntHUkacafY79UMos8XKJepO9ipYpk7jbM4qKeFj1CiqVK0_YeFQoVU4tOui/exec';
-
+// --- Авторизация ---
 loginBtn.addEventListener('click', () => {
   const login = loginInput.value.trim();
   const pass = passInput.value.trim();
@@ -30,71 +47,51 @@ loginBtn.addEventListener('click', () => {
         alert('Неверный логин или пароль');
       }
     })
-    .catch(() => alert('Ошибка авторизации'))
+    .catch(err => {
+      console.error('[LOGIN] Ошибка:', err);
+      alert('Ошибка авторизации');
+    })
     .finally(() => loginLoader.classList.add('hidden'));
 });
 
-// Выбор единственного блока
-let selectedBlocks = [];
+// --- Выбор блока ---
 document.querySelectorAll('.block-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.block-btn').forEach(b => b.classList.remove('active'));
     selectedBlocks = [btn.dataset.block];
     btn.classList.add('active');
-    console.log('Выбран блок:', selectedBlocks[0]);
   });
 });
 
-// Настройка сканера
-const html5QrCode = new Html5Qrcode("scanner");
-const config = { fps: 6, qrbox: { width: 250, height: 250 } };
-const status = document.getElementById('status');
-const timeRecord = document.getElementById('time-record');
-const modalOverlay = document.getElementById('modal-overlay');
-const fioModal = document.getElementById('fio-modal');
-const fioInput = document.getElementById('fio-input');
-const submitFioBtn = document.getElementById('submit-fio');
-const historyBody = document.getElementById('history-body');
-const cameraLoader = document.getElementById('camera-loader');
-
-// Флаг, что камера запущена
-let scannerStarted = false;
-
+// --- Работа сканера ---
 function showCameraLoader() { cameraLoader.classList.remove('hidden'); }
 function hideCameraLoader() { cameraLoader.classList.add('hidden'); }
-
 
 function startScanner() {
   showCameraLoader();
   html5QrCode.start({ facingMode: "environment" }, config, qrSuccess)
     .then(() => {
       hideCameraLoader();
-      // сразу же удаляем любой оставшийся статус
       const st = document.querySelector('#scanner > .html5-qrcode-status');
       if (st) st.remove();
     })
-    .catch(() => {
+    .catch(err => {
+      console.error('[SCANNER START] Ошибка:', err);
       hideCameraLoader();
       showToast('Не удалось запустить камеру');
     });
 }
 
-
 function qrSuccess(decodedText) {
-  // Обрабатываем только сам текст
   handleScan(decodedText.trim());
 }
 
 function handleScan(id) {
   scannedEmployeeId = id;
-
-  // приостанавливаем сканер и показываем overlay-лоадер
   html5QrCode.pause();
-  // после pause()
-const st = document.querySelector('#scanner > .html5-qrcode-status');
-if (st) st.remove();
-
-  document.getElementById('scanner-pause-overlay').classList.add('visible');
+  const st = document.querySelector('#scanner > .html5-qrcode-status');
+  if (st) st.remove();
+  scannerPauseOverlay.classList.add('visible');
 
   const now = new Date();
   const rawDate = now.toLocaleDateString('ru-RU');
@@ -103,7 +100,7 @@ if (st) st.remove();
   fetch(`${GOOGLE_SCRIPT_URL}?employeeId=${id}&date=${date}`)
     .then(r => r.json())
     .then(data => {
-      if (!data.name || !data.name.trim()) {
+      if (!data.name || typeof data.name !== 'string' || !data.name.trim()) {
         hideCameraLoader();
         openFioModal();
         return;
@@ -143,8 +140,8 @@ if (st) st.remove();
       }
     })
     .catch(err => {
-      hideCameraLoader();
       console.error('[SCAN] Ошибка:', err);
+      hideCameraLoader();
       showToast('Ошибка соединения с сервером');
       resumeScanner();
     });
@@ -179,43 +176,20 @@ function logAction(action, date) {
     });
 }
 
+// --- Работа с ФИО ---
 submitFioBtn.addEventListener('click', () => {
-  const fio = fioInput.value.trim();
-  if (!fio) return alert('Введите ФИО!');
-  employeeName = fio;
-  fioInput.value = '';
-  closeFioModal();
-  logAction('Вход', new Date().toLocaleDateString('ru-RU'));
+  try {
+    const fio = fioInput.value.trim();
+    if (!fio) return alert('Введите ФИО!');
+    employeeName = fio;
+    fioInput.value = '';
+    closeFioModal();
+    logAction('Вход', new Date().toLocaleDateString('ru-RU'));
+  } catch (err) {
+    console.error('[FIO SUBMIT] Ошибка:', err);
+    showToast('Ошибка при сохранении ФИО');
+  }
 });
-
-function resumeScanner() {
-  document.getElementById('scanner-pause-overlay').classList.remove('visible');
-  html5QrCode.resume();
-}
-
-function updateUI(action, date, time, blockString) {
-  document.getElementById('result').classList.remove('hidden');
-  const resultCard = document.querySelector('.result-section');
-resultCard.classList.remove('highlight');
-void resultCard.offsetWidth; // ← триггер перерисовки
-resultCard.classList.add('highlight');
-
-
-  status.textContent = `${employeeName} — ${action}`;
-  timeRecord.innerHTML = `<strong>Дата:</strong> ${date}<br>
-                          <strong>Время:</strong> ${time}<br>
-                          <strong>Тип:</strong> ${action}<br>
-                          <strong>Блок:</strong> ${blockString}`;
-  const row = document.createElement('tr');
-  row.innerHTML = `<td>${employeeName}</td>
-                   <td>${date}</td>
-                   <td>${time}</td>
-                   <td>${action}</td>
-                   <td>${currentUser}</td>
-                   <td>${blockString}</td>`;
-  historyBody.prepend(row);
-  if (historyBody.rows.length > 5) historyBody.deleteRow(-1);
-}
 
 function openFioModal() {
   modalOverlay.classList.remove('hidden');
@@ -232,6 +206,32 @@ function closeFioModal() {
   }, 300);
 }
 
+// --- Обновление интерфейса ---
+function updateUI(action, date, time, blockString) {
+  document.getElementById('result').classList.remove('hidden');
+  const resultCard = document.querySelector('.result-section');
+  resultCard.classList.remove('highlight');
+  void resultCard.offsetWidth;
+  resultCard.classList.add('highlight');
+
+  status.textContent = `${employeeName} — ${action}`;
+  timeRecord.innerHTML = `<strong>Дата:</strong> ${date}<br>
+                          <strong>Время:</strong> ${time}<br>
+                          <strong>Тип:</strong> ${action}<br>
+                          <strong>Блок:</strong> ${blockString}`;
+
+  const row = document.createElement('tr');
+  row.innerHTML = `<td>${employeeName}</td>
+                   <td>${date}</td>
+                   <td>${time}</td>
+                   <td>${action}</td>
+                   <td>${currentUser}</td>
+                   <td>${blockString}</td>`;
+  historyBody.prepend(row);
+  if (historyBody.rows.length > 5) historyBody.deleteRow(-1);
+}
+
+// --- Модальные уведомления ---
 function showModalMessage(msg) {
   openFioModal();
   const c = fioModal.querySelector('.modal-content');
@@ -248,4 +248,9 @@ function showToast(msg) {
   t.textContent = msg;
   document.getElementById('toast-container').appendChild(t);
   setTimeout(() => t.remove(), 3000);
+}
+
+function resumeScanner() {
+  scannerPauseOverlay.classList.remove('visible');
+  html5QrCode.resume();
 }
