@@ -1,21 +1,13 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+  <link rel="icon" href="logo.ico" type="image/x-icon">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>UNIT</title>
-
-  <!-- Иконка -->
-  <link rel="icon" href="logo.ico" type="image/x-icon">
-
-  <!-- PWA -->
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#09f">
-
-  <!-- Стили -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="style.css">
-
-  <!-- Скрипты -->
   <script src="https://unpkg.com/html5-qrcode" defer></script>
   <script src="app.js" defer></script>
 </head>
@@ -51,9 +43,15 @@
             <div class="spinner"></div>
           </div>
           <div id="scanner"></div>
-          <div id="scanner-frame" class="scanner-frame"></div>
+            <!-- ваш оверлей-рамка -->
+  <div id="scanner-frame" class="scanner-frame"></div>
+  <!-- оверлей-пауза + спиннер -->
+  <div id="scanner-pause-overlay" class="scanner-pause hidden">
+    <div class="scanner-spinner"></div>
+  </div>
 
-          <!-- ЕДИНСТВЕННЫЙ overlay -->
+
+          <!-- Overlay loader вместо "Scanner paused" -->
           <div id="scanner-pause-overlay" class="scanner-pause hidden">
             <div class="scanner-spinner"></div>
           </div>
@@ -80,11 +78,7 @@
       <div class="history-title"><h2>Последние действия</h2></div>
       <div class="table-wrapper">
         <table id="history-table">
-          <thead>
-            <tr>
-              <th>ФИО</th><th>Дата</th><th>Время</th><th>Тип</th><th>Кто</th><th>Блок</th>
-            </tr>
-          </thead>
+          <thead><tr><th>ФИО</th><th>Дата</th><th>Время</th><th>Тип</th><th>Кто</th><th>Блок</th></tr></thead>
           <tbody id="history-body"></tbody>
         </table>
       </div>
@@ -102,14 +96,5 @@
   </div>
 
   <div id="toast-container"></div>
-
-  <!-- Регистрация сервис-воркера -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js')
-        .then(() => console.log("✅ Service Worker зарегистрирован"))
-        .catch(err => console.error("❌ Ошибка Service Worker:", err));
-    }
-  </script>
 </body>
 </html>
