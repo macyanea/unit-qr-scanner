@@ -1,18 +1,23 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <link rel="icon" href="logo.ico" type="image/x-icon">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>UNIT</title>
+  <link rel="icon" href="logo.ico" type="image/x-icon">
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#09f">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
   <link rel="stylesheet" href="style.css">
-  <script src="https://unpkg.com/html5-qrcode" defer></script>
-  <script src="app.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" defer></script>
+  <script src="app1.js" defer></script>
 </head>
 <body>
-  <!-- Авторизационная модалка -->
+  <!-- Авторизация -->
   <div id="login-modal-overlay" class="modal-overlay"></div>
   <div id="login-modal" class="modal">
     <div class="modal-content show">
@@ -42,22 +47,16 @@
           <div id="camera-loader" class="camera-loader hidden">
             <div class="spinner"></div>
           </div>
-          <div id="scanner"></div>
-            <!-- ваш оверлей-рамка -->
-  <div id="scanner-frame" class="scanner-frame"></div>
-  <!-- оверлей-пауза + спиннер -->
-  <div id="scanner-pause-overlay" class="scanner-pause hidden">
-    <div class="scanner-spinner"></div>
-  </div>
-
-
-          <!-- Overlay loader вместо "Scanner paused" -->
+          <div id="scanner">
+            <video id="camera" autoplay muted playsinline></video>
+            <canvas id="qr-canvas" class="hidden"></canvas>
+          </div>
+          <div id="scanner-frame" class="scanner-frame"></div>
           <div id="scanner-pause-overlay" class="scanner-pause hidden">
             <div class="scanner-spinner"></div>
           </div>
         </section>
 
-        <!-- Контейнер выбора блока -->
         <div id="block-selector" class="block-selector">
           <button class="block-btn" data-block="3">3</button>
           <button class="block-btn" data-block="3a">3а</button>
@@ -85,7 +84,6 @@
     </section>
   </div>
 
-  <!-- Модалка ввода ФИО -->
   <div id="modal-overlay" class="modal-overlay hidden"></div>
   <div id="fio-modal" class="modal hidden">
     <div class="modal-content hide">
@@ -96,5 +94,14 @@
   </div>
 
   <div id="toast-container"></div>
+
+  <!-- Service Worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(() => console.log("✅ Service Worker зарегистрирован"))
+        .catch(err => console.error("❌ Ошибка Service Worker:", err));
+    }
+  </script>
 </body>
 </html>
