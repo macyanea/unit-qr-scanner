@@ -1,6 +1,3 @@
-// === app.js (рефакторинг) ===
-
-// --- Константы и переменные ---
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw8lwqgrDlhKTx6Sz0uYq39duz7oBjRY_i_gHtAzNFPwJpTuBG3pA_8_oaaQZtbdcq2kA/exec';
 
 const loginModalOverlay = document.getElementById('login-modal-overlay');
@@ -9,26 +6,24 @@ const loginInput = document.getElementById('login-input');
 const passInput = document.getElementById('pass-input');
 const loginBtn = document.getElementById('login-btn');
 const loginLoader = document.getElementById('login-loader');
-
-const html5QrCode = new Html5Qrcode("scanner");
-const config = { fps: 6, qrbox: { width: 250, height: 250 } };
+const video = document.getElementById("camera");
+const canvas = document.getElementById("qr-canvas");
+const ctx = canvas.getContext("2d");
+const scannerPauseOverlay = document.getElementById('scanner-pause-overlay');
+const cameraLoader = document.getElementById('camera-loader');
 const status = document.getElementById('status');
 const timeRecord = document.getElementById('time-record');
+const historyBody = document.getElementById('history-body');
 const modalOverlay = document.getElementById('modal-overlay');
 const fioModal = document.getElementById('fio-modal');
 const fioInput = document.getElementById('fio-input');
 const submitFioBtn = document.getElementById('submit-fio');
-const historyBody = document.getElementById('history-body');
-const cameraLoader = document.getElementById('camera-loader');
-const scannerPauseOverlay = document.getElementById('scanner-pause-overlay');
-
+let scanInterval = null;
 let currentUser = '';
-let employeeName = '';
 let scannedEmployeeId = '';
-let scannerStarted = false;
+let employeeName = '';
 let selectedBlocks = [];
 
-// --- Авторизация ---
 loginBtn.addEventListener('click', () => {
   const login = loginInput.value.trim();
   const pass = passInput.value.trim();
@@ -47,14 +42,61 @@ loginBtn.addEventListener('click', () => {
         alert('Неверный логин или пароль');
       }
     })
-    .catch(err => {
-      console.error('[LOGIN] Ошибка:', err);
-      alert('Ошибка авторизации');
-    })
+    .catch(() => alert('Ошибка авторизации'))
     .finally(() => loginLoader.classList.add('hidden'));
 });
 
-// --- Выбор блока ---
+function showCameraLoader() { cameraLoader.classList.remove('hidden'); }
+function hideCameraLoader() { cameraLoader.classList.add('hidden'); }
+
+function startScanner() {
+  showCameraLoader();
+
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+    .then(stream => {
+      video.srcObject = stream;
+      video.onloadedmetadata = () => {
+        video.play();
+        hideCameraLoader();
+        startQRLoop();
+      };
+    })
+    .catch(err => {
+      console.error("[CAMERA] Ошибка доступа:", err);
+      showToast("Не удалось запустить камеру");
+      hideCameraLoader();
+    });
+}
+
+function startQRLoop() {
+  scanInterval = setInterval(() => {
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, canvas.width, canvas.height);
+
+    if (code) {
+      clearInterval(scanInterval);
+      pauseScanner();
+      handleScan(code.data.trim());
+    }
+  }, 500);
+}
+
+function pauseScanner() {
+  const stream = video.srcObject;
+  if (stream) stream.getTracks().forEach(track => track.stop());
+}
+
+function resumeScanner() {
+  scannerPauseOverlay.classList.remove('visible');
+  startScanner();
+}
+
 document.querySelectorAll('.block-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.block-btn').forEach(b => b.classList.remove('active'));
@@ -63,34 +105,8 @@ document.querySelectorAll('.block-btn').forEach(btn => {
   });
 });
 
-// --- Работа сканера ---
-function showCameraLoader() { cameraLoader.classList.remove('hidden'); }
-function hideCameraLoader() { cameraLoader.classList.add('hidden'); }
-
-function startScanner() {
-  showCameraLoader();
-  html5QrCode.start({ facingMode: "environment" }, config, qrSuccess)
-    .then(() => {
-      hideCameraLoader();
-      const st = document.querySelector('#scanner > .html5-qrcode-status');
-      if (st) st.remove();
-    })
-    .catch(err => {
-      console.error('[SCANNER START] Ошибка:', err);
-      hideCameraLoader();
-      showToast('Не удалось запустить камеру');
-    });
-}
-
-function qrSuccess(decodedText) {
-  handleScan(decodedText.trim());
-}
-
 function handleScan(id) {
   scannedEmployeeId = id;
-  html5QrCode.pause();
-  const st = document.querySelector('#scanner > .html5-qrcode-status');
-  if (st) st.remove();
   scannerPauseOverlay.classList.add('visible');
 
   const now = new Date();
@@ -176,37 +192,15 @@ function logAction(action, date) {
     });
 }
 
-// --- Работа с ФИО ---
 submitFioBtn.addEventListener('click', () => {
-  try {
-    const fio = fioInput.value.trim();
-    if (!fio) return alert('Введите ФИО!');
-    employeeName = fio;
-    fioInput.value = '';
-    closeFioModal();
-    logAction('Вход', new Date().toLocaleDateString('ru-RU'));
-  } catch (err) {
-    console.error('[FIO SUBMIT] Ошибка:', err);
-    showToast('Ошибка при сохранении ФИО');
-  }
+  const fio = fioInput.value.trim();
+  if (!fio) return alert('Введите ФИО!');
+  employeeName = fio;
+  fioInput.value = '';
+  closeFioModal();
+  logAction('Вход', new Date().toLocaleDateString('ru-RU'));
 });
 
-function openFioModal() {
-  modalOverlay.classList.remove('hidden');
-  fioModal.classList.remove('hidden');
-  fioModal.querySelector('.modal-content').classList.replace('hide','show');
-}
-
-function closeFioModal() {
-  const c = fioModal.querySelector('.modal-content');
-  c.classList.replace('show','hide');
-  setTimeout(() => {
-    modalOverlay.classList.add('hidden');
-    fioModal.classList.add('hidden');
-  }, 300);
-}
-
-// --- Обновление интерфейса ---
 function updateUI(action, date, time, blockString) {
   document.getElementById('result').classList.remove('hidden');
   const resultCard = document.querySelector('.result-section');
@@ -231,7 +225,21 @@ function updateUI(action, date, time, blockString) {
   if (historyBody.rows.length > 5) historyBody.deleteRow(-1);
 }
 
-// --- Модальные уведомления ---
+function openFioModal() {
+  modalOverlay.classList.remove('hidden');
+  fioModal.classList.remove('hidden');
+  fioModal.querySelector('.modal-content').classList.replace('hide','show');
+}
+
+function closeFioModal() {
+  const c = fioModal.querySelector('.modal-content');
+  c.classList.replace('show','hide');
+  setTimeout(() => {
+    modalOverlay.classList.add('hidden');
+    fioModal.classList.add('hidden');
+  }, 300);
+}
+
 function showModalMessage(msg) {
   openFioModal();
   const c = fioModal.querySelector('.modal-content');
@@ -248,9 +256,4 @@ function showToast(msg) {
   t.textContent = msg;
   document.getElementById('toast-container').appendChild(t);
   setTimeout(() => t.remove(), 3000);
-}
-
-function resumeScanner() {
-  scannerPauseOverlay.classList.remove('visible');
-  html5QrCode.resume();
 }
