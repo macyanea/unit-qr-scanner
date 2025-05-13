@@ -1,14 +1,14 @@
-// ====================================
-// Автоматическая настройка формата колонки даты (C) и блока (G) теперь прямо в doPost()
-// ====================================
+// ===============================
+// Google Apps Script — backend API
+// ===============================
+
+// === Инициализация форматов ===
 function onOpen() {
   const sheet = getLogSheet();
-  sheet.getRange('C:C').setNumberFormat('@STRING@');
+  sheet.getRange('C:C').setNumberFormat('@STRING@'); // колонка "Дата"
 }
 
-// ====================================
-// Утилиты для доступа к таблицам
-// ====================================
+// === Доступ к листам ===
 function getLogSheet() {
   return SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Logs");
 }
@@ -17,29 +17,85 @@ function getUsersSheet() {
   return SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
 }
 
-// ====================================
-// Обработка GET-запроса (авторизация и проверка последнего входа)
-// ====================================
+// === Обработка GET-запроса ===
 function doGet(e) {
+  try {
+    const empId = String(e.parameter.employeeId || '').trim();
+    const login = e.parameter.login;
+    const password = e.parameter.password;
+    const date = String(e.parameter.date || '').trim();
+
+    // Авторизация
+    if (login && password) return auth(login, password);
+
+    // Проверка сканов
+    if (!empId || !date) return createJsonOutput({ error: "Missing parameters" });
+
+    return getLastScanInfo(empId, date);
+  } catch (err) {
+    Logger.log("GET error: " + err);
+    return createJsonOutput({ error: "Internal server error" });
+  }
+}
+
+// === Обработка POST-запроса ===
+function doPost(e) {
+  try {
+    const empId  = String(e.parameter.employeeId || '').trim();
+    let fullName = String(e.parameter.fullName || '').trim();
+    const date   = String(e.parameter.date || '').trim();
+    const time   = String(e.parameter.time || '').trim();
+    const action = String(e.parameter.action || '').trim();
+    const who    = String(e.parameter.who || '').trim();
+    const block  = String(e.parameter.block || '').trim();
+
+    if (!empId || !date || !time || !action || !block || !who) {
+      return createJsonOutput({ error: "Missing required fields" });
+    }
+
+    const sheet = getLogSheet();
+
+    // Попытка найти имя, если не передано
+    if (!fullName) {
+      const data = sheet.getDataRange().getValues();
+      const existing = data.find(row =>
+        String(row[0]).trim() === empId && String(row[1]).trim() !== ''
+      );
+      if (existing) fullName = String(existing[1]).trim();
+    }
+
+    sheet.appendRow([empId, fullName, date, time, action, who, block]);
+
+    // Установка форматов
+    const lastRow = sheet.getLastRow();
+    sheet.getRange(lastRow, 3).setNumberFormat('@STRING@'); // дата (C)
+    sheet.getRange(lastRow, 7).setNumberFormat('@STRING@'); // блок (G)
+
+    return createJsonOutput({ status: "ok" });
+
+  } catch (err) {
+    Logger.log("POST error: " + err);
+    return createJsonOutput({ error: "Internal server error" });
+  }
+}
+
+// === Авторизация пользователя ===
+function auth(login, password) {
+  const sheet = getUsersSheet();
+  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+  const isValid = data.some(row =>
+    String(row[0]) === login && String(row[1]) === password
+  );
+  return createJsonOutput({ auth: isValid });
+}
+
+// === Получение информации о последних сканах ===
+function getLastScanInfo(empId, date) {
   const sheet = getLogSheet();
-  const empId = String(e.parameter.employeeId || '').trim();
-  const login = e.parameter.login;
-  const password = e.parameter.password;
-  const date = String(e.parameter.date || '').trim();
-
-  if (login && password) {
-    return auth(login, password);
-  }
-
-  if (!empId || !date) {
-    return createJsonOutput({ error: "Missing parameters" });
-  }
-
   const data = sheet.getDataRange().getValues();
 
   const nameEntry = data.find(row =>
-    String(row[0]).trim() === empId &&
-    String(row[1]).trim() !== ''
+    String(row[0]).trim() === empId && String(row[1]).trim() !== ''
   );
   const name = nameEntry ? String(nameEntry[1]).trim() : '';
 
@@ -53,8 +109,7 @@ function doGet(e) {
 
   if (scans > 0) {
     const lastEntry = matchesToday[matchesToday.length - 1];
-    const dateCell = lastEntry[2];
-    const timeCell = lastEntry[3];
+    const [dateCell, timeCell] = [lastEntry[2], lastEntry[3]];
     const tz = Session.getScriptTimeZone();
 
     const dateStr = (dateCell instanceof Date)
@@ -76,52 +131,7 @@ function doGet(e) {
   });
 }
 
-// ====================================
-// Обработка POST-запроса (добавление новой записи)
-// ====================================
-function doPost(e) {
-  const empId  = String(e.parameter.employeeId || '').trim();
-  let fullName = String(e.parameter.fullName || '').trim();
-  const date   = String(e.parameter.date || '').trim();
-  const time   = String(e.parameter.time || '').trim();
-  const action = String(e.parameter.action || '').trim();
-  const who    = String(e.parameter.who || '').trim();
-  const block  = String(e.parameter.block || '').trim();
-
-  const sheet = getLogSheet();
-
-  if (!fullName) {
-    const data = sheet.getDataRange().getValues();
-    const existing = data.find(r =>
-      String(r[0]).trim() === empId &&
-      String(r[1]).trim() !== ''
-    );
-    if (existing) fullName = String(existing[1]).trim();
-  }
-
-  sheet.appendRow([empId, fullName, date, time, action, who, block]);
-
-  // Устанавливаем формат колонки C (дата) и G (блок) как текст
-  const lastRow = sheet.getLastRow();
-  sheet.getRange(lastRow, 3).setNumberFormat('@STRING@'); // дата
-  sheet.getRange(lastRow, 7).setNumberFormat('@STRING@'); // блок
-
-  return createJsonOutput({ status: 'ok' });
-}
-
-// ====================================
-// Авторизация по Users-листу
-// ====================================
-function auth(login, password) {
-  const sheet = getUsersSheet();
-  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
-  const ok = data.some(r => String(r[0]) === login && String(r[1]) === password);
-  return createJsonOutput({ auth: ok });
-}
-
-// ====================================
-// Универсальный JSON-ответ
-// ====================================
+// === Формирование JSON-ответа ===
 function createJsonOutput(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
