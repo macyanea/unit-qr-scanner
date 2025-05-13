@@ -1,0 +1,128 @@
+// ====================================
+// Автоматическая настройка формата колонки даты (C) и блока (G) теперь прямо в doPost()
+// ====================================
+function onOpen() {
+  const sheet = getLogSheet();
+  sheet.getRange('C:C').setNumberFormat('@STRING@');
+}
+
+// ====================================
+// Утилиты для доступа к таблицам
+// ====================================
+function getLogSheet() {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Logs");
+}
+
+function getUsersSheet() {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
+}
+
+// ====================================
+// Обработка GET-запроса (авторизация и проверка последнего входа)
+// ====================================
+function doGet(e) {
+  const sheet = getLogSheet();
+  const empId = String(e.parameter.employeeId || '').trim();
+  const login = e.parameter.login;
+  const password = e.parameter.password;
+  const date = String(e.parameter.date || '').trim();
+
+  if (login && password) {
+    return auth(login, password);
+  }
+
+  if (!empId || !date) {
+    return createJsonOutput({ error: "Missing parameters" });
+  }
+
+  const data = sheet.getDataRange().getValues();
+
+  const nameEntry = data.find(row =>
+    String(row[0]).trim() === empId &&
+    String(row[1]).trim() !== ''
+  );
+  const name = nameEntry ? String(nameEntry[1]).trim() : '';
+
+  const matchesToday = data.filter(row =>
+    String(row[0]).trim() === empId &&
+    String(row[2]).trim() === date
+  );
+
+  const scans = matchesToday.length;
+  let lastTime = '';
+
+  if (scans > 0) {
+    const lastEntry = matchesToday[matchesToday.length - 1];
+    const dateCell = lastEntry[2];
+    const timeCell = lastEntry[3];
+    const tz = Session.getScriptTimeZone();
+
+    const dateStr = (dateCell instanceof Date)
+      ? Utilities.formatDate(dateCell, tz, "dd.MM.yyyy")
+      : String(dateCell);
+
+    const timeStr = (timeCell instanceof Date)
+      ? Utilities.formatDate(timeCell, tz, "HH:mm:ss")
+      : String(timeCell);
+
+    lastTime = `${dateStr} ${timeStr}`;
+  }
+
+  return createJsonOutput({
+    exists: scans > 0,
+    name: name,
+    scans: scans,
+    lastTime: lastTime
+  });
+}
+
+// ====================================
+// Обработка POST-запроса (добавление новой записи)
+// ====================================
+function doPost(e) {
+  const empId  = String(e.parameter.employeeId || '').trim();
+  let fullName = String(e.parameter.fullName || '').trim();
+  const date   = String(e.parameter.date || '').trim();
+  const time   = String(e.parameter.time || '').trim();
+  const action = String(e.parameter.action || '').trim();
+  const who    = String(e.parameter.who || '').trim();
+  const block  = String(e.parameter.block || '').trim();
+
+  const sheet = getLogSheet();
+
+  if (!fullName) {
+    const data = sheet.getDataRange().getValues();
+    const existing = data.find(r =>
+      String(r[0]).trim() === empId &&
+      String(r[1]).trim() !== ''
+    );
+    if (existing) fullName = String(existing[1]).trim();
+  }
+
+  sheet.appendRow([empId, fullName, date, time, action, who, block]);
+
+  // Устанавливаем формат колонки C (дата) и G (блок) как текст
+  const lastRow = sheet.getLastRow();
+  sheet.getRange(lastRow, 3).setNumberFormat('@STRING@'); // дата
+  sheet.getRange(lastRow, 7).setNumberFormat('@STRING@'); // блок
+
+  return createJsonOutput({ status: 'ok' });
+}
+
+// ====================================
+// Авторизация по Users-листу
+// ====================================
+function auth(login, password) {
+  const sheet = getUsersSheet();
+  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+  const ok = data.some(r => String(r[0]) === login && String(r[1]) === password);
+  return createJsonOutput({ auth: ok });
+}
+
+// ====================================
+// Универсальный JSON-ответ
+// ====================================
+function createJsonOutput(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
