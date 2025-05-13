@@ -1,4 +1,3 @@
-
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/ВАШ_ID/exec';
 
 const canvas = document.getElementById('camera-canvas');
@@ -45,7 +44,7 @@ function startQRScan(video) {
 function startScanner() {
   navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
     .then(stream => {
-      const video = document.createElement("video");
+      const video = document.getElementById("hidden-video");
       video.srcObject = stream;
       video.setAttribute("playsinline", true);
       video.muted = true;
