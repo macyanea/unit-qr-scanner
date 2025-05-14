@@ -10,7 +10,7 @@ const loginLoader = document.getElementById('login-loader');
 let currentUser = '';
 
 
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyCl5cRUntHUkacafY79UMos8XKJepO9ipYpk7jbM4qKeFj1CiqVK0_YeFQoVU4tOui/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyFqHVhtnba5OsaaWvzu04ln8_i6vvcsHiComx2hMOvd_nKunWCmKCqkcMcE4xYwisQ/exec';
 
 loginBtn.addEventListener('click', () => {
   const login = loginInput.value.trim();
